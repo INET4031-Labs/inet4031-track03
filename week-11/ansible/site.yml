@@ -1,0 +1,77 @@
+---
+# INET 4031 Challenge Track 3: DevSecOps
+# This playbook extends the Weeks 1-4 baseline with the Track 3 security-scanning role.
+#
+# Weeks 1-4 baseline infrastructure (from Solved Repositories/week-04/ansible/site.yml):
+# Week 1: Baseline environment setup (inline tasks)
+# Week 2: Deploy application stack (app-stack role)
+# Week 3: Set up k3d cluster (k3d-setup role)
+# Week 4: Install and initialize OpenTofu (opentofu-setup role)
+# Track 3: Add SBOM and secrets detection scanning (security-scanning role)
+#
+# By Week 14 Demo Day, this playbook should rebuild the entire environment from scratch.
+#
+# Usage:
+#   Dry-run (check mode):
+#     ansible-playbook -i inventory ansible/site.yml --check
+#
+#   Full deployment:
+#     ansible-playbook -i inventory ansible/site.yml
+
+- name: Baseline environment setup
+  hosts: localhost
+  connection: local
+  become: yes
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Ensure baseline packages are installed
+      apt:
+        name:
+          - curl
+          - git
+          - vim
+          - python3
+          - python3-pip
+        state: present
+
+    - name: Ensure Docker is installed
+      apt:
+        name: docker.io
+        state: present
+
+- name: Deploy application stack
+  hosts: localhost
+  connection: local
+  become: yes
+
+  roles:
+    - app-stack
+
+- name: Set up k3d cluster
+  hosts: localhost
+  connection: local
+  become: yes
+
+  roles:
+    - k3d-setup
+
+- name: Install and initialize OpenTofu
+  hosts: localhost
+  connection: local
+  become: yes
+
+  roles:
+    - opentofu-setup
+
+- name: DevSecOps - SBOM and Secrets Detection (Challenge Track 3)
+  hosts: localhost
+  connection: local
+  become: yes
+
+  roles:
+    - security-scanning

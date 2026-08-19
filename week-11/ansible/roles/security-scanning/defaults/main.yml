@@ -1,0 +1,24 @@
+---
+# Default variables for security-scanning role
+
+# SBOM scanning tool: grype or trivy
+sbom_scanner: "grype"
+
+# Secrets detection tool: gitleaks or trufflehog
+secrets_scanner: "gitleaks"
+
+# Installation method
+sbom_install_method: "curl"
+secrets_install_method: "curl"
+
+# Scan settings
+sbom_output_format: "table"
+sbom_fail_on_critical: false
+
+# Secrets detection settings
+secrets_fail_on_detection: true
+secrets_scan_history: true
+
+# Paths to scan
+application_image: "localhost:5000/incident-app:latest"
+repository_root: "."

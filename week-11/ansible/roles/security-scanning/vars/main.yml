@@ -1,0 +1,20 @@
+---
+# Variables for security-scanning role
+
+# URLs for tool installation
+grype_install_url: "https://raw.githubusercontent.com/anchore/grype/main/install.sh"
+trivy_install_url: "https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh"
+gitleaks_install_url: "https://raw.githubusercontent.com/gitleaks/gitleaks-action/main/install.sh"
+
+# Tool versions (can be overridden)
+grype_version: "latest"
+trivy_version: "latest"
+gitleaks_version: "latest"
+
+# Scanning thresholds
+critical_vulnerability_threshold: 0
+high_vulnerability_threshold: 5
+
+# Report locations
+sbom_report_dir: "/tmp/sbom-reports"
+secrets_report_dir: "/tmp/secrets-reports"

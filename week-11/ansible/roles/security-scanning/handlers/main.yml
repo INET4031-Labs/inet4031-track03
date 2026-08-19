@@ -1,0 +1,13 @@
+---
+# Handlers for security-scanning role
+# Used to trigger actions when security scanning configuration changes
+
+- name: Restart security scanning services
+  systemd:
+    name: security-scanning
+    state: restarted
+  listen: "restart security scanning"
+
+- name: Rebuild security scanning cache
+  command: /usr/local/bin/grype db update
+  listen: "update security db"

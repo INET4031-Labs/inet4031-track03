@@ -1,0 +1,69 @@
+---
+# Security Scanning Role
+# Week 11 Deliverable: Install SBOM generation and secrets detection tools
+
+# Install Grype for SBOM scanning
+- name: Install Grype for SBOM scanning
+  shell: |
+    set -e
+    GRYPE_VERSION=$(curl -s https://api.github.com/repos/anchore/grype/releases/latest | grep tag_name | cut -d'"' -f4)
+    curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+  args:
+    creates: /usr/local/bin/grype
+  register: grype_install_result
+  changed_when: grype_install_result.rc == 0
+
+# Verify Grype installation
+- name: Verify Grype is installed
+  command: /usr/local/bin/grype --version
+  register: grype_version
+  changed_when: false
+  failed_when: grype_version.rc != 0
+
+- name: Display Grype version
+  debug:
+    msg: "Grype version: {{ grype_version.stdout }}"
+
+# Install gitleaks for secrets detection
+- name: Install gitleaks for secrets detection
+  shell: |
+    set -e
+    GITLEAKS_LATEST=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | grep tag_name | cut -d'"' -f4 | sed 's/^v//')
+    GITLEAKS_URL="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_LATEST}/gitleaks-linux-amd64"
+    curl -sSfL "${GITLEAKS_URL}" -o /usr/local/bin/gitleaks
+    chmod +x /usr/local/bin/gitleaks
+  args:
+    creates: /usr/local/bin/gitleaks
+  register: gitleaks_install_result
+  changed_when: gitleaks_install_result.rc == 0
+
+# Verify gitleaks installation
+- name: Verify gitleaks is installed
+  command: /usr/local/bin/gitleaks version
+  register: gitleaks_version
+  changed_when: false
+  failed_when: gitleaks_version.rc != 0
+
+- name: Display gitleaks version
+  debug:
+    msg: "gitleaks version: {{ gitleaks_version.stdout }}"
+
+# Verify both tools are in PATH
+- name: Verify Grype is accessible via PATH
+  command: which grype
+  register: grype_path
+  changed_when: false
+  failed_when: grype_path.rc != 0
+
+- name: Verify gitleaks is accessible via PATH
+  command: which gitleaks
+  register: gitleaks_path
+  changed_when: false
+  failed_when: gitleaks_path.rc != 0
+
+- name: Display PATH verification
+  debug:
+    msg: |
+      Security scanning tools verified in PATH:
+      - Grype: {{ grype_path.stdout }}
+      - gitleaks: {{ gitleaks_path.stdout }}
