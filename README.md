@@ -99,6 +99,3 @@ Each sprint requires cross-functional input:
 Refer to `Documents/Sprint_Structure_Layout.md` for role-specific responsibilities.
 
 ---
-
-**Track Lead Email:** vangwendy.05@gmail.com
-**Last Updated:** 2026-08-18
