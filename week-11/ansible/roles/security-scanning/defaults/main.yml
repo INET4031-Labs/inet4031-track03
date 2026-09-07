@@ -20,5 +20,8 @@ secrets_fail_on_detection: true
 secrets_scan_history: true
 
 # Paths to scan
-application_image: "localhost:5000/incident-app:latest"
+# No local registry exists in this course; scan the real locally-built image
+# tag (matches the Week 2 Docker Compose build). In CI, the equivalent
+# published image is ghcr.io/<owner/repo, lowercased>/flask-app.
+application_image: "week-2-flask:latest"
 repository_root: "."

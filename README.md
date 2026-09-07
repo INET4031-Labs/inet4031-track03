@@ -29,44 +29,44 @@ Extend CI/CD with automated security checks that gate merges.
 
 ## Directory Structure
 
+Sprint retrospectives and QA reports for all five weeks now live in a single
+top-level `docs/` folder rather than per-week `docs/` folders. Each week
+folder keeps only its own track-specific artifacts.
+
 ```
 track-03-devsecops/
 ├── README.md (this file)
+├── docs/
+│   ├── qa-report-10.md
+│   ├── qa-report-11.md
+│   ├── qa-report-12.md
+│   ├── qa-report-13.md
+│   ├── qa-report-14.md
+│   ├── sprint-10-retrospective.md
+│   ├── sprint-11-retrospective.md
+│   ├── sprint-12-retrospective.md
+│   ├── sprint-13-retrospective.md
+│   └── sprint-14-retrospective.md
 ├── week-10/
 │   ├── README.md
-│   └── docs/
-│       ├── sprint-5-retrospective.md
-│       ├── environment-log.md
-│       ├── acceptance-criteria.md
-│       └── qa-report-5.md
+│   └── adr.md
 ├── week-11/
 │   ├── README.md
-│   └── docs/
-│       ├── sprint-6-retrospective.md
-│       ├── environment-log.md
-│       ├── acceptance-criteria.md
-│       └── qa-report-6.md
+│   └── ansible/
+│       ├── site.yml
+│       ├── inventory
+│       └── roles/
+│           ├── app-stack/
+│           ├── k3d-setup/
+│           ├── opentofu-setup/
+│           └── security-scanning/
 ├── week-12/
 │   ├── README.md
-│   └── docs/
-│       ├── sprint-6-retrospective.md
-│       ├── environment-log.md
-│       ├── acceptance-criteria.md
-│       └── qa-report-6.md
+│   └── demo-plan.md
 ├── week-13/
-│   ├── README.md
-│   └── docs/
-│       ├── sprint-7-retrospective.md
-│       ├── environment-log.md
-│       ├── acceptance-criteria.md
-│       └── qa-report-7.md
+│   └── README.md
 └── week-14/
-    ├── README.md
-    └── docs/
-        ├── sprint-7-retrospective.md
-        ├── environment-log.md
-        ├── acceptance-criteria.md
-        └── qa-report-7.md
+    └── README.md
 ```
 
 ## Deliverables Summary

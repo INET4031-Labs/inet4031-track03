@@ -10,8 +10,12 @@ on:
       - main
 
 env:
-  REGISTRY: localhost:5000
-  IMAGE_NAME: incident-app
+  # No local registry exists in this course. The image is built locally by
+  # Docker BuildKit below (load: true, push: false) and scanned straight out
+  # of the runner's Docker daemon under its real local name/tag, matching
+  # the Week 2 Docker Compose build (week-2-flask:latest). In CI, the
+  # equivalent published image is ghcr.io/<owner/repo, lowercased>/flask-app.
+  IMAGE_NAME: week-2-flask
   IMAGE_TAG: latest
 
 jobs:
@@ -73,7 +77,7 @@ jobs:
           context: .
           push: false
           load: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -87,8 +91,8 @@ jobs:
         id: grype-scan
         run: |
           echo "Generating SBOM for container image..."
-          grype ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o json > sbom-report.json || true
-          grype ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o table > sbom-report.txt || true
+          grype ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o json > sbom-report.json || true
+          grype ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o table > sbom-report.txt || true
 
           echo "=== SBOM Report (Table Format) ==="
           cat sbom-report.txt
@@ -124,7 +128,7 @@ jobs:
           context: .
           push: false
           load: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -142,10 +146,10 @@ jobs:
           # Week 11-12: Advisory mode (do not fail)
           # Week 13+: Blocking mode (fail on CRITICAL)
           echo "Running Grype in advisory mode (Week 11-12)"
-          grype ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+          grype ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             --fail-on critical -o json > vulnerability-report.json || true
 
-          grype ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+          grype ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             -o table > vulnerability-report.txt || true
 
           echo "=== Vulnerability Report ==="

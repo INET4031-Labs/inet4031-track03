@@ -1,186 +1,117 @@
+## Week 11: Core Build — SBOM Generation and Secrets Detection
+
+**Sprint 6, Part 1 | Asynchronous**
+
+### Overview
+
+Week 11 is the first core build sprint for the DevSecOps track. Building on the tool decisions from Week 10, your team integrates SBOM generation and secrets detection into a real GitHub Actions workflow — `.github/workflows/security-scanning.yml`, already scaffolded with `secrets-detection`, `sbom-generation`, `vulnerability-scan`, and `summary` jobs — and proves both new checks work against real test branches. This is additive to the baseline `ci.yml` Trivy gate that's been running since Week 6, not a replacement for it: by the end of this week your repository will have two independent workflows watching different things.
+
+### Learning Objectives
+
+- Wire SBOM generation into a CI workflow that scans the real Flask application image, not a placeholder
+- Wire secrets detection into a CI workflow so it blocks a merge on a real positive and passes on real clean code
+- Reason about container image identity when there is no registry to lean on
+- Produce and interpret CI evidence (workflow run URLs, artifact contents) as documentation, not just a passing checkmark
+
+### Prerequisites
+
+- Week 10 architecture decision (`week-10/adr.md`) signed off, naming your SBOM/vulnerability tool and secrets-detection tool
+- Completed Weeks 1-9 work available as a peer directory, with the Week 2 Docker Compose stack buildable (`docker compose -f week-2/docker-compose.yml build`)
+- Push access to test branches on the team's GitHub repository (secrets detection can't be proven without actually pushing a fake secret)
+
+### Sprint 6, Part 1
+
+Week 11 is asynchronous — no mandatory class time. Teams self-organize around CI integration, with daily async standups and code review on workflow changes. The ticket list from Week 10's backlog is your starting point.
+
 ---
-**Week 1-9 Prerequisite**
 
-Weeks 10-14 assume your completed Weeks 1-9 repositories are available as peer directories in `Student Repositories/`. This track's Ansible roles reference your prior work:
-- `devsecops` role uses your Flask application from Week 2 (`../week-02/`)
-- `devsecops` role uses your infrastructure code from Week 4 (`../week-04/` or `../infrastructure/`)
+### Part 1: SBOM Generation
 
-Your track repo does NOT copy these — it integrates with them. Ensure your Week 1-9 work is complete and accessible before Week 11.
+**Step 1.** Confirm the `sbom-generation` job in `.github/workflows/security-scanning.yml` builds the real image and scans it. There is no registry anywhere in this course — local or CI — so the job builds `week-2-flask:latest` directly with `docker/build-push-action` (`push: false`, `load: true`) and scans it straight out of the runner's Docker daemon:
 
----
-
-# Week 11: Core Build - SBOM and Secrets Detection
-
-## Overview
-
-Week 11 is the core implementation sprint for the DevSecOps track. Your team will integrate SBOM generation and secrets detection into the GitHub Actions CI pipeline, building on the architecture decisions from Week 10.
-
-## Sprint Focus
-
-**Asynchronous work:** Teams self-organize around CI/CD integration tasks. Expected work includes:
-- Adding SBOM generation to the build workflow
-- Adding secrets detection (gitleaks or trufflehog) as a gating step
-- Creating test branches and validating that detection works
-- Documenting the pipeline integration
-
-## Deliverable
-
-By end of Week 11, the CI pipeline must:
-
-1. **Generate SBOM on Every Build**
-   - Tool: Grype or Trivy (chosen in Week 10)
-   - Scope: Scan the Flask application container image
-   - Output: SBOM artifact stored in CI or uploaded to workflow logs
-   - Must not block the merge (advisory only)
-
-2. **Detect Secrets on Every Commit**
-   - Tool: gitleaks or trufflehog (chosen in Week 10)
-   - Scope: Scan Git history and current commit for secrets
-   - Integration: Runs before image build
-   - Result: Blocks merge if secrets are detected
-   - Must pass on clean code (no false negatives on real secrets)
-
-3. **Test Coverage**
-   - [ ] Create a test branch and commit a fake secret (e.g., "aws_secret_key=AKIA...")
-   - [ ] Verify the CI pipeline rejects the commit
-   - [ ] Create another test branch and push clean code
-   - [ ] Verify the pipeline passes
-   - [ ] Document both runs in the environment log
-
-## Implementation Guidance
-
-### SBOM Generation
-
-**Grype Example:**
 ```yaml
 - name: Generate SBOM
   run: |
-    grype localhost:5000/incident-app:latest -o table > sbom.txt
+    grype week-2-flask:latest -o table > sbom.txt
     cat sbom.txt
 ```
 
-**Trivy Example:**
-```yaml
-- name: Generate SBOM
-  run: |
-    trivy image localhost:5000/incident-app:latest --format=table > sbom.txt
-    cat sbom.txt
-```
+**Step 2.** Confirm the job runs after the image is built and does **not** fail the workflow (advisory only, per the Week 10 decision) — check that its `grype`/`trivy` invocation is followed by `|| true` or an equivalent non-blocking pattern.
 
-### Secrets Detection
+**Step 3.** Confirm the SBOM output is retained as a workflow artifact (`actions/upload-artifact`), not just printed to the log and discarded.
 
-**gitleaks Example:**
-```yaml
-- name: Detect Secrets
-  run: |
-    gitleaks detect --source . --exit-code 1
-```
+> **Enterprise Pattern:** Production SBOM pipelines almost always start advisory-only. You want weeks of real output before you trust a scanner enough to let it block a merge — flipping the gate to blocking is a Week 13 decision, not a Week 11 one.
 
-**trufflehog Example:**
-```yaml
-- name: Detect Secrets
-  run: |
-    trufflehog git file://. --fail
-```
+---
 
-## Acceptance Criteria
+### Part 2: Secrets Detection
 
-See `docs/acceptance-criteria.md` for the formal requirements.
+**Step 1.** Confirm the `secrets-detection` job runs gitleaks (or your Week 10 choice) against the full checkout (`fetch-depth: 0`, so history is scanned, not just the diff) and runs *before* the image build — a leaked credential shouldn't have to wait for a full build to be caught.
 
-## Verification
+**Step 2.** Unlike SBOM generation, secrets detection is meant to block per the Week 10 CI integration plan. Update the job so it actually fails the workflow on a detection instead of swallowing the result — the scaffold currently runs `gitleaks detect --source . --verbose || true`, which reports but never fails. Decide with your team whether to flip this to blocking now or hold it advisory through Week 12 per the workflow's documented escalation schedule, and record which you chose and why in `docs/qa-report-11.md`.
 
-Run the verification command to confirm tools are installed:
+**Step 3.** Set up branch protection on `main` requiring this check to pass, if your team decided to make it blocking now.
+
+---
+
+### Part 3: Prove It With Test Branches
+
+**Step 1.** Create `test/clean-merge`, make a trivial clean commit, push it, and confirm both new jobs run and pass.
+
 ```bash
-which grype 2>/dev/null && echo "grype installed" || which trivy 2>/dev/null && echo "trivy installed" || echo "FAIL"
+git checkout -b test/clean-merge
+git commit --allow-empty -m "Test: clean commit for security-scanning pipeline"
+git push origin test/clean-merge
 ```
 
-## Container Registry Strategy
+**Step 2.** Create `test/secret-commit`, add an obviously fake secret, push it, and confirm the secrets-detection job catches it.
 
-### Local Development vs. CI Environment
+```bash
+git checkout -b test/secret-commit
+echo "aws_secret_access_key=AKIA1234567890ABCDEF" >> test-secret.txt
+git add test-secret.txt
+git commit -m "Test: fake secret for gitleaks detection"
+git push origin test/secret-commit
+```
 
-The security scanning pipeline works differently in local development and CI:
+**Step 3.** Record both workflow run URLs, the pass/fail result, and a screenshot in `docs/qa-report-11.md`.
 
-#### Local Development (Ansible Role)
-- **Registry:** `localhost:5000` (k3d local registry)
-- **Prerequisite:** k3d cluster running locally with `docker-compose.yml`
-- **Usage:** 
-  ```bash
-  # Start k3d with local registry
-  docker-compose up -d
-  
-  # Build and push Flask app to local registry
-  docker build -t localhost:5000/incident-app:latest .
-  docker push localhost:5000/incident-app:latest
-  
-  # Run Grype scan against local image
-  ansible-playbook -i inventory week-11/ansible/site.yml
-  ```
-- **Advantages:** 
-  - No external dependencies
-  - Fast iteration cycles
-  - Mirrors CI environment exactly
-  - Useful for debugging security issues locally
+---
 
-#### GitHub Actions CI (Workflow)
-- **Registry:** Docker daemon on `ubuntu-latest` runner
-- **Approach:** Build image in workflow, scan from Docker daemon (no push to registry)
-- **Usage:**
-  ```yaml
-  - name: Build container image
-    uses: docker/build-push-action@v5
-    with:
-      push: false
-      load: true
-      tags: localhost:5000/incident-app:latest
-  
-  - name: Scan image
-    run: grype localhost:5000/incident-app:latest -o table
-  ```
-- **Advantages:**
-  - No registry required (avoids setup overhead)
-  - Consistent with local dev environment
-  - Faster CI/CD pipeline
-  - Container image never leaves the builder
+### Validation Checks
 
-#### Alternative: GitHub Container Registry (GHCR)
-- **Registry:** `ghcr.io/yourorg/incident-app:latest`
-- **When to use:** If you need persistent image storage or cross-platform builds
-- **Trade-off:** Requires additional setup and auth, slightly slower CI
+**QA runs all validation checks.** By end of week, both new checks must have real, reproducible evidence — not a description of what they're supposed to do.
 
-### Recommended Approach for Week 11
+#### Validation Check: SBOM Generation
 
-**Use the Docker daemon approach (CI only builds, no push):**
-- Simplest to implement
-- No external dependencies
-- Works on all runners (Ubuntu, macOS, Windows)
-- Aligns with Ansible role's `localhost:5000` scanning interface
+QA confirms the `sbom-generation` job in a recent `security-scanning.yml` run completed successfully, produced a non-empty SBOM artifact, and did not block the workflow.
 
-If students want to test locally on k3d:
-1. Build image locally: `docker build -t localhost:5000/incident-app:latest .`
-2. Push to k3d: `docker push localhost:5000/incident-app:latest` (if k3d running)
-3. Run Ansible playbook to test security scanning tools
-4. CI pipeline will build its own image and scan independently
+#### Validation Check: Secrets Detection Blocks and Passes Correctly
 
-## Sprint Structure
+QA opens the `test/clean-merge` and `test/secret-commit` workflow runs and confirms: the clean branch's secrets-detection job passed, and the secret branch's job caught the fake credential (visible in the job log or gitleaks report artifact) with a result consistent with the team's Week 10 decision on blocking vs. advisory.
 
-**Week 11 is asynchronous.** Teams work on their own schedule with:
-- Daily async standups (Slack or email)
-- Pair programming sessions as needed
-- Code review on CI workflow changes
-- Testing and validation in parallel
+---
 
-## Success Metrics
+### Deliverables
 
-- [ ] SBOM is generated on every commit
-- [ ] SBOM is visible in CI logs or as an artifact
-- [ ] Secrets detector blocks a merge when secrets are present
-- [ ] Secrets detector passes when code is clean
-- [ ] Both test runs are documented with screenshots or logs
+- [ ] `sbom-generation` job scans the real `week-2-flask:latest` image and uploads a non-empty SBOM artifact
+- [ ] `secrets-detection` job runs before the image build against full git history
+- [ ] Team decision on whether secrets detection blocks now or stays advisory is documented in `docs/qa-report-11.md`
+- [ ] `test/clean-merge` branch pushed and both jobs pass
+- [ ] `test/secret-commit` branch pushed and secrets detection catches the fake secret
+- [ ] Both workflow run URLs and results recorded in `docs/qa-report-11.md`
+- [ ] `docs/sprint-11-retrospective.md` filled in
 
-## Known Issues / Blockers
+---
 
-[Document any access issues, tool installation failures, or environment problems here]
+### Sprint Backlog: Preparing for Week 12
 
-## Next Steps (Week 12)
+The Scrum Master should open the following tickets for the second half of Sprint 6:
 
-Week 12 will add automated DAST scanning and ensure that the pipeline blocks not just secrets but also CRITICAL image vulnerabilities. You'll also prepare evidence of both blocks firing.
+- Add a liveness precondition check before any DAST step (verify the Week 2 stack is actually up before scanning it)
+- Add the DAST job to `security-scanning.yml` using the Week 10 tool decision
+- Make the `vulnerability-scan` job's CRITICAL check blocking
+- Create `test/vuln-critical-w12` and `test/secret-block-w12` test branches
+- Re-verify `test/clean-build-w12` passes all four checks end-to-end
+
+---

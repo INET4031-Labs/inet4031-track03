@@ -1,160 +1,141 @@
-# Week 14: Demo Day - Final Rebuild and Presentation
+## Week 14: Demo Day — Final Rebuild and Presentation
 
-## Overview
+**Sprint 7, Part 2 | Synchronous — Capstone**
 
-Week 14 is Demo Day. Your team will execute a final live demonstration where the container and Kubernetes cluster are wiped and rebuilt using the Ansible playbook, proving that all configuration is idempotent and no manual steps are required. This is the capstone of the DevSecOps track.
+### Overview
 
-## Demo Day Scenario
+Week 14 is Demo Day, the capstone of the DevSecOps track. In front of an audience, your team wipes the container and Kubernetes cluster, rebuilds the entire environment from a clean state using the Ansible playbook you finished in Week 13, verifies the security tooling live, and walks through the CI/CD pipeline showing all three gates — SBOM (advisory), secrets detection, and CRITICAL vulnerability blocking — behaving correctly. This proves, on stage, that the environment is genuinely defined as code: no manual setup, no "it works on my machine."
 
-**Live Execution:**
-1. Wipe container storage: `docker system prune -a --volumes`
-2. Reset Kubernetes cluster (if using k3d): `k3d cluster delete && k3d cluster create`
-3. Run Ansible playbook: `ansible-playbook -i ansible/inventory ansible/site.yml`
-4. Verify security tools are installed and functional
-5. Walk through CI/CD pipeline showing all three security gates
-6. Answer questions from audience
+### Learning Objectives
 
-**Timing:** 10-15 minutes (typical for demo slot)
+- Execute a live, unscripted-but-rehearsed infrastructure rebuild in front of an audience
+- Present and defend security tooling and gate decisions to non-team stakeholders
+- Demonstrate the practical value of idempotent infrastructure-as-code under real time pressure
+- Reflect on the track as a whole and identify what would change with more time
 
-## Deliverable
+### Prerequisites
 
-By end of Week 14, you will have:
+- Week 13 dry run and demo rehearsal completed, with real timings recorded
+- `security-scanning` role wired into `week-11/ansible/site.yml` and proven idempotent
+- All three test branches (`test/clean-build-w12`, `test/secret-block-w12`, `test/vuln-critical-w12`) confirmed to still show correct pass/fail status
+- At least 10GB free disk space on the demo machine, and a fallback plan for the most fragile step identified in Week 13
 
-1. **Live Playbook Execution**
-   - Full environment rebuild from clean state
-   - No manual steps required
-   - All prior week's roles execute correctly
-   - Security scanning role installs Grype/Trivy and secrets detector
+### Sprint 7, Part 2 — Demo Day
 
-2. **Verification on Live Audience**
-   - Grype or Trivy version check
-   - Secrets detector version check
-   - Navigate to GitHub Actions and show CI pipeline
-   - Point out the three test branches and their outcomes
+This is a live, synchronous, timed presentation — typically 10-15 minutes. Everyone on the team presents their assigned section from the Week 13 rehearsal.
 
-3. **Security Gates Demonstration**
-   - Explain why each gate matters
-   - Show the passing build (clean code, clean image)
-   - Show the secret commit block (red X)
-   - Show the CRITICAL vulnerability block (red X)
-   - Discuss the value to the development workflow
+---
 
-4. **Q&A and Wrap-Up**
-   - Answer questions about tool choices and integration
-   - Discuss any challenges overcome
-   - Highlight key learnings
+### Part 1: Environment Wipe
 
-## Pre-Demo Checklist
+**Step 1.** Show the current state to the audience before wiping anything:
 
-- [ ] All team members are present and have reviewed their talking points
-- [ ] Host machine has sufficient disk space for `docker system prune -a` (frees ~5-10GB typically)
-- [ ] Kubernetes cluster can be reset quickly (k3d delete + create typically takes 1-2 minutes)
-- [ ] Ansible playbook is on disk and accessible
-- [ ] GitHub Actions pipeline is visible (public repo or credentials configured)
-- [ ] Network connectivity is stable (for GitHub access if showing live)
-- [ ] Timing has been rehearsed; team knows who speaks when
-
-## Live Demo Flow
-
-### Phase 1: Environment Wipe (2-3 minutes)
-
-**Commands:**
 ```bash
-# Show current state
 kubectl get pods -n default
 docker ps
-
-# Wipe storage
-docker system prune -a --volumes
-
-# Reset cluster (k3d example)
-k3d cluster delete inet4031
-k3d cluster create inet4031
 ```
 
-**Audience Note:** Explain that this is equivalent to a brand-new deployment; no state or configuration is retained.
+**Step 2.** Wipe container storage and reset the cluster:
 
-### Phase 2: Playbook Rebuild (5-10 minutes)
-
-**Command:**
 ```bash
-cd ansible
+docker system prune -a --volumes
+k3d cluster delete myapp
+k3d cluster create myapp --agents 2 --port "8081:80@loadbalancer" --k3s-arg "--disable=traefik@server:0"
+```
+
+> **Troubleshooting:** If `k3d cluster create` hangs and
+> `docker logs k3d-myapp-server-0` shows repeated `"too many open files"` /
+> `"error creating fsnotify watcher"` errors, the host has run out of inotify watch
+> instances — a common RHEL default (`fs.inotify.max_user_instances=128`) is too low
+> for a fresh k3s cluster. Fix: `sudo sysctl -w fs.inotify.max_user_instances=1024`,
+> then delete and retry cluster creation.
+
+**Narration:** explain to the audience that this is equivalent to a brand-new machine — no state or configuration survives.
+
+---
+
+### Part 2: Playbook Rebuild
+
+**Step 1.** Run the full playbook live:
+
+```bash
+cd week-11/ansible
 ansible-playbook -i inventory site.yml
 ```
 
-**Live Audience Observation:**
-- Playbook runs end-to-end
-- All roles execute (app-stack, postgres, nginx, k3d, kompose, monitoring, backup, security-scanning)
-- Environment comes up cleanly
+**Step 2.** Narrate what's happening as each play runs: baseline package setup, `app-stack` (Docker Compose), `k3d-setup` (the `myapp` cluster), `opentofu-setup` (OpenTofu install and init), and finally `security-scanning` (this track's addition — installing your chosen SBOM/vulnerability and secrets-detection tools).
 
-**Narration:** Walk the audience through what's happening at each role, emphasizing that no manual commands are needed.
+> **Enterprise Pattern:** The reason this playbook is a superset built up week by week, rather than one script written at the end, is that each week's addition was independently tested against a real environment. That's what makes a full rebuild on stage a reasonable thing to attempt live at all.
 
-### Phase 3: Tool Verification (1-2 minutes)
+---
 
-**Commands:**
+### Part 3: Tool Verification
+
+Run the verification commands live, on screen:
+
 ```bash
-which grype && grype --version || which trivy && trivy --version
-which gitleaks && gitleaks version || which trufflehog && trufflehog version
+which grype 2>/dev/null && grype --version || which trivy 2>/dev/null && trivy --version
+which gitleaks 2>/dev/null && gitleaks version || which trufflehog 2>/dev/null && trufflehog version
 ```
 
-**Audience Note:** Confirm that the security tools are installed and ready to use.
+---
 
-### Phase 4: CI/CD Pipeline Review (2-3 minutes)
+### Part 4: CI/CD Pipeline Walkthrough
 
-**Navigate to GitHub Actions:**
-1. Open repository in browser
-2. Show Workflows tab
-3. Point out the three test branches:
-   - `test/clean-build-w12` (green checkmark, all gates passed)
-   - `test/secret-block-w12` (red X, secrets detected, merge blocked)
-   - `test/vuln-critical-w12` (red X, CRITICAL vulnerability found, merge blocked)
-4. Click into each and highlight the failure message
+**Step 1.** Open the repository's GitHub Actions tab and navigate to `security-scanning.yml`'s run history.
 
-**Audience Note:** Explain how these gates protect the pipeline and prevent risky code from reaching production.
+**Step 2.** Show all three test branches and their outcomes:
+- `test/clean-build-w12` — green, all four checks (SBOM, secrets, vulnerability scan, DAST) pass
+- `test/secret-block-w12` — red, blocked at secrets detection
+- `test/vuln-critical-w12` — red, blocked at the vulnerability scan, with the CVE ID visible
 
-### Phase 5: Q&A and Wrap-Up (1-2 minutes)
+**Step 3.** Also point out the baseline `ci.yml` Trivy CRITICAL gate, running since Week 6 — make clear to the audience that this track added three new gates on top of an existing one, rather than building security tooling from nothing.
 
-**Typical Questions:**
-- Why Grype/Trivy over other SBOM tools?
-- How does this integrate with the development workflow?
-- What happens if a developer encounters a blocked merge?
-- How often are the security scans updated?
+---
 
-**Key Messages to Reinforce:**
-- Security is integrated into every commit
-- Merges are gated by objective security criteria
-- Tools are lightweight and fast (CI pipeline is not noticeably slower)
-- The same playbook that runs in CI can rebuild the entire environment from scratch
+### Part 5: Q&A and Wrap-Up
 
-## Success Metrics
+Be ready to answer:
+- Why this SBOM/vulnerability tool and secrets detector, over the alternatives considered in Week 10?
+- What happens when a developer's merge gets blocked — what's the remediation path?
+- How much slower is the pipeline with these gates than without them?
+- What would the team do differently with another sprint?
 
-- [ ] Playbook runs cleanly from start to finish
-- [ ] Environment is fully functional after rebuild
-- [ ] All security tools are verified and working
-- [ ] CI/CD pipeline demonstration is clear and compelling
-- [ ] Team answers questions confidently
-- [ ] Demo completes within time slot
+---
 
-## Known Issues / Fallbacks
+### Validation Checks
 
-[Document any known fragile steps or fallbacks:
-- If Trivy version is outdated, have backup: `trivy image --version`
-- If GitHub is unavailable, have a pre-recorded screenshot of CI pipeline
-- If playbook times out, have pre-built state as fallback
-]
+**QA runs all validation checks** during the Week 13 rehearsal — Demo Day itself is the live execution of those already-validated checks, not a first attempt.
 
-## Post-Demo Notes
+#### Validation Check: Full Rebuild Succeeds Live
 
-After Demo Day, the track is complete. The Ansible playbook becomes part of the course's standard deployment process, and the security gates remain active in the CI/CD pipeline for future development.
+The playbook completes with exit code 0, all roles report success, and both security tools verify correctly, all performed live rather than pre-recorded.
 
-## Course Completion
+#### Validation Check: All Three Gates Demonstrated
 
-By end of Week 14, the DevSecOps track has:
-- Integrated SBOM generation into CI (Week 11)
-- Integrated secrets detection into CI (Week 11)
-- Integrated DAST scanning into CI (Week 12)
-- Implemented blocking gates for CRITICAL vulnerabilities and secrets (Week 12)
-- Automated the entire deployment with Ansible playbook (Week 13-14)
-- Demonstrated the solution in front of an audience (Week 14)
+Each of the three test branches is opened live and its actual pass/fail status matches what's being claimed to the audience — this was already confirmed in Week 13, and Demo Day simply re-shows it.
 
-The pipeline now rejects insecure code automatically, shifting security left into the development process.
+---
+
+### Deliverables
+
+- [ ] Live environment wipe and rebuild completed with no manual intervention
+- [ ] Both security tools verified live, output visible to the audience
+- [ ] All three test branches shown with correct, matching pass/fail status
+- [ ] Baseline `ci.yml` gate and this track's three new gates both explained to the audience
+- [ ] Demo completed within the allocated time slot
+- [ ] `docs/qa-report-14.md` and `docs/sprint-14-retrospective.md` filled in and signed
+
+---
+
+### Wrap-Up: Track Retrospective
+
+This is the last week of the DevSecOps track — there is no Week 15. Close out as a team:
+
+- **What shipped:** a `security-scanning` CI workflow with SBOM generation, secrets detection, DAST scanning, and CRITICAL vulnerability blocking, all layered on top of the baseline `ci.yml` Trivy gate that's been running since Week 6; an idempotent `security-scanning` Ansible role that installs the same tooling locally; and a proven, wiped-and-rebuilt environment.
+- **What to reflect on as a team:** which gate decisions (advisory vs. blocking, which tool) would you revisit with more time? What part of the Week 13 dry run was the most fragile, and why? Would the SBOM/DAST steps scale to a larger application, or were shortcuts taken that wouldn't hold up?
+- **What carries forward:** the security gates remain active in `security-scanning.yml` and `ci.yml` going forward — this isn't a one-time demo artifact, it's the pipeline the codebase now runs under permanently.
+
+Sign off Sprint 7 in `docs/sprint-14-retrospective.md`, and confirm `docs/qa-report-14.md` reflects the actual, live Demo Day outcome — not the Week 13 rehearsal's.
+
+---
